@@ -6,8 +6,15 @@ import '../services/pokeapi_service.dart';
 
 class PokemonDetailScreen extends StatefulWidget {
   final String? pokemonName;
+  final List<PokemonListItem>? pokemonList;
+  final int? initialIndex;
 
-  const PokemonDetailScreen({Key? key, this.pokemonName}) : super(key: key);
+  const PokemonDetailScreen({
+    Key? key,
+    this.pokemonName,
+    this.pokemonList,
+    this.initialIndex,
+  }) : super(key: key);
 
   @override
   State<PokemonDetailScreen> createState() => _PokemonDetailScreenState();
@@ -54,10 +61,16 @@ class _PokemonDetailScreenState extends State<PokemonDetailScreen> with SingleTi
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
-    if (widget.pokemonName != null) {
-      _searchController.text = widget.pokemonName!;
-      _searchPokemon(_searchController.text);
+    _tabController = TabController(length: 2, vsync: this); // Assuming 2 tabs: About and Base Stats
+    if (widget.pokemonList != null && widget.initialIndex != null && widget.initialIndex! < widget.pokemonList!.length) {
+      // Load Pokemon detail from the list if passed
+      final pokemonNameFromList = widget.pokemonList![widget.initialIndex!].name;
+      _searchController.text = pokemonNameFromList.toCapitalized();
+      _searchPokemon(pokemonNameFromList);
+    } else if (widget.pokemonName != null) {
+      // Fallback to loading by name if list/index not provided
+      _searchController.text = widget.pokemonName!.toCapitalized();
+      _searchPokemon(widget.pokemonName!);
     }
   }
 
@@ -87,14 +100,18 @@ class _PokemonDetailScreenState extends State<PokemonDetailScreen> with SingleTi
 
     try {
       final pokemon = await _pokeApiService.fetchPokemonDetail(query);
-      if (_searchController.text.trim().toLowerCase() == query) {
+      if (_searchController.text.trim().toLowerCase() == query ||
+          (widget.pokemonList != null && widget.initialIndex != null &&
+           widget.pokemonList![widget.initialIndex!].name.toLowerCase() == query)) {
         setState(() {
           _pokemonDetail = pokemon;
           _isLoading = false;
         });
       }
     } catch (e) {
-      if (_searchController.text.trim().toLowerCase() == query) {
+      if (_searchController.text.trim().toLowerCase() == query ||
+          (widget.pokemonList != null && widget.initialIndex != null &&
+           widget.pokemonList![widget.initialIndex!].name.toLowerCase() == query)) {
         setState(() {
           _isLoading = false;
           _errorMessage = e.toString().replaceFirst('Exception: ', '');
@@ -118,7 +135,7 @@ class _PokemonDetailScreenState extends State<PokemonDetailScreen> with SingleTi
 
     final double screenHeight = MediaQuery.of(context).size.height;
     final double cardTopPosition = screenHeight * 0.4;
-    final double imageCenterOffset = 100; 
+    final double imageCenterOffset = 100;
 
     return Scaffold(
       backgroundColor: backgroundColor,
@@ -128,7 +145,7 @@ class _PokemonDetailScreenState extends State<PokemonDetailScreen> with SingleTi
             top: 0,
             left: 0,
             right: 0,
-            height: cardTopPosition + imageCenterOffset, 
+            height: cardTopPosition + imageCenterOffset,
             child: Container(
               color: backgroundColor,
               child: SafeArea(
@@ -176,7 +193,7 @@ class _PokemonDetailScreenState extends State<PokemonDetailScreen> with SingleTi
                           children: _pokemonDetail!.types.map((type) => _buildTypeChip(type)).toList(),
                         ),
                       ],
-                      if (_pokemonDetail == null) ...[
+                      if (_pokemonDetail == null && (widget.pokemonList == null || widget.initialIndex == null)) ...[
                         TextField(
                           controller: _searchController,
                           onChanged: _onSearchChanged,
@@ -211,75 +228,75 @@ class _PokemonDetailScreenState extends State<PokemonDetailScreen> with SingleTi
           ),
 
           Positioned(
-        top: cardTopPosition,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        child: _isLoading // <--- START CHANGES FROM HERE
-            ? const Center(child: CircularProgressIndicator(color: Colors.white))
-            : _errorMessage != null
-                ? Center(
-                    child: Text(
-                      _errorMessage!,
-                      style: const TextStyle(color: Colors.white, fontSize: 16),
-                      textAlign: TextAlign.center,
-                    ),
-                  )
-                : _pokemonDetail == null // <--- THIS IS THE KEY CONDITIONAL CHECK
+            top: cardTopPosition,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator(color: Colors.white))
+                : _errorMessage != null
                     ? Center(
-                        child: _searchController.text.isEmpty
-                            ? const Text(
-                                'Start typing a Pokemon name or ID to search.',
-                                style: TextStyle(fontSize: 18, color: Colors.white),
-                                textAlign: TextAlign.center,
-                              )
-                            : const Text(
-                                'No Pokemon found with that name/ID.',
-                                style: TextStyle(fontSize: 18, color: Colors.white),
-                                textAlign: TextAlign.center,
-                              ),
-                      )
-                    : Container( // <--- THIS IS THE CONTAINER FOR THE WHITE CARD
-                        decoration: const BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.only(
-                            topLeft: Radius.circular(30),
-                            topRight: Radius.circular(30),
-                          ),
+                        child: Text(
+                          _errorMessage!,
+                          style: const TextStyle(color: Colors.white, fontSize: 16),
+                          textAlign: TextAlign.center,
                         ),
-                        child: Padding(
-                          padding: EdgeInsets.only(top: imageCenterOffset + 20, left: 16.0, right: 16.0),
-                          child: Column(
-                            children: [
-                              TabBar(
-                                controller: _tabController,
-                                labelColor: Colors.black,
-                                unselectedLabelColor: Colors.grey,
-                                indicatorColor: backgroundColor,
-                                indicatorSize: TabBarIndicatorSize.tab,
-                                tabs: const [
-                                  Tab(text: 'About'),
-                                  Tab(text: 'Base Stats'),
+                      )
+                    : _pokemonDetail == null
+                        ? Center(
+                            child: (widget.pokemonList == null || widget.initialIndex == null)
+                                ? const Text(
+                                    'Start typing a Pokemon name or ID to search.',
+                                    style: TextStyle(fontSize: 18, color: Colors.white),
+                                    textAlign: TextAlign.center,
+                                  )
+                                : const Text(
+                                    'Failed to load Pokemon details from list.',
+                                    style: TextStyle(fontSize: 18, color: Colors.white),
+                                    textAlign: TextAlign.center,
+                                  ),
+                          )
+                        : Container(
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.only(
+                                topLeft: Radius.circular(30),
+                                topRight: Radius.circular(30),
+                              ),
+                            ),
+                            child: Padding(
+                              padding: EdgeInsets.only(top: imageCenterOffset + 20, left: 16.0, right: 16.0),
+                              child: Column(
+                                children: [
+                                  TabBar(
+                                    controller: _tabController,
+                                    labelColor: Colors.black,
+                                    unselectedLabelColor: Colors.grey,
+                                    indicatorColor: backgroundColor,
+                                    indicatorSize: TabBarIndicatorSize.tab,
+                                    tabs: const [
+                                      Tab(text: 'About'),
+                                      Tab(text: 'Base Stats'),
+                                    ],
+                                  ),
+                                  Expanded(
+                                    child: TabBarView(
+                                      controller: _tabController,
+                                      children: [
+                                        _buildAboutTab(_pokemonDetail!),
+                                        _buildBaseStatsTab(_pokemonDetail!),
+                                      ],
+                                    ),
+                                  ),
                                 ],
                               ),
-                              Expanded(
-                                child: TabBarView(
-                                  controller: _tabController,
-                                  children: [
-                                    _buildAboutTab(_pokemonDetail!),
-                                    _buildBaseStatsTab(_pokemonDetail!),
-                                  ],
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
-                        ),
-                      ),
           ),
 
           if (_pokemonDetail != null)
             Positioned(
-              top: cardTopPosition - imageCenterOffset, 
+              top: cardTopPosition - imageCenterOffset,
               left: 0,
               right: 0,
               child: Center(

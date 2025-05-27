@@ -11,7 +11,25 @@ class PokeApiService {
     if (response.statusCode == 200) {
       final Map<String, dynamic> data = json.decode(response.body);
       final List<dynamic> results = data['results'];
-      return results.map((json) => PokemonListItem.fromJson(json)).toList();
+      final List<Future<PokemonListItem>> detailFetches = results.map((result) async {
+        final detailResponse = await http.get(Uri.parse(result['url']));
+        if (detailResponse.statusCode == 200) {
+          final Map<String, dynamic> detailData = json.decode(detailResponse.body);
+          final List<String> types = (detailData['types'] as List)
+              .map((typeJson) => typeJson['type']['name'].toString())
+              .toList();
+          return PokemonListItem(
+            name: result['name'],
+            url: result['url'],
+            primaryType: types.isNotEmpty ? types.first : null,
+          );
+        } else {
+          print('Failed to fetch detail for ${result['name']}: ${detailResponse.statusCode}');
+          return PokemonListItem(name: result['name'], url: result['url']);
+        }
+      }).toList();
+
+      return Future.wait(detailFetches); 
     } else {
       throw Exception('Failed to load Pokemon list');
     }
@@ -33,7 +51,7 @@ class PokeApiService {
       final Map<String, dynamic> pokemonData = json.decode(pokemonResponse.body);
       final Map<String, dynamic> speciesData = json.decode(speciesResponse.body);
 
-      pokemonData['species']['name'] = speciesData['name'];   
+      pokemonData['species_data'] = speciesData;
       pokemonData['gender_rate'] = speciesData['gender_rate'];
       pokemonData['egg_groups'] = speciesData['egg_groups'];
 
