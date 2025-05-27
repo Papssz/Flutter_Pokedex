@@ -18,15 +18,30 @@ class PokeApiService {
   }
 
   Future<PokemonDetail> fetchPokemonDetail(String nameOrId) async {
-    final response = await http.get(Uri.parse('$_baseUrl/pokemon/$nameOrId'));
+    final pokemonUrl = Uri.parse('$_baseUrl/pokemon/$nameOrId');
+    final speciesUrl = Uri.parse('$_baseUrl/pokemon-species/$nameOrId');
 
-    if (response.statusCode == 200) {
-      final Map<String, dynamic> data = json.decode(response.body);
-      return PokemonDetail.fromJson(data);
-    } else if (response.statusCode == 404) {
+    final responses = await Future.wait([
+      http.get(pokemonUrl),
+      http.get(speciesUrl),
+    ]);
+
+    final pokemonResponse = responses[0];
+    final speciesResponse = responses[1];
+
+    if (pokemonResponse.statusCode == 200 && speciesResponse.statusCode == 200) {
+      final Map<String, dynamic> pokemonData = json.decode(pokemonResponse.body);
+      final Map<String, dynamic> speciesData = json.decode(speciesResponse.body);
+
+      pokemonData['species']['name'] = speciesData['name'];   
+      pokemonData['gender_rate'] = speciesData['gender_rate'];
+      pokemonData['egg_groups'] = speciesData['egg_groups'];
+
+      return PokemonDetail.fromJson(pokemonData);
+    } else if (pokemonResponse.statusCode == 404 || speciesResponse.statusCode == 404) {
       throw Exception('Pokemon not found');
     } else {
-      throw Exception('Failed to load Pokemon details');
+      throw Exception('Failed to load Pokemon details. Statuses: ${pokemonResponse.statusCode}, ${speciesResponse.statusCode}');
     }
   }
 }

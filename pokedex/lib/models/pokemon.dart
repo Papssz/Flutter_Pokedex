@@ -1,8 +1,9 @@
 class PokemonListItem {
   final String name;
   final String url;
+  final String? primaryType; 
 
-  PokemonListItem({required this.name, required this.url});
+  PokemonListItem({required this.name, required this.url, this.primaryType});
 
   factory PokemonListItem.fromJson(Map<String, dynamic> json) {
     return PokemonListItem(
@@ -24,6 +25,11 @@ class PokemonDetail {
   final List<String> types;
   final List<String> abilities;
   final List<Stat> stats;
+  final double height;
+  final double weight;
+  final String species;
+  final int gender;
+  final List<String> eggGroups;
 
   PokemonDetail({
     required this.id,
@@ -32,6 +38,11 @@ class PokemonDetail {
     required this.types,
     required this.abilities,
     required this.stats,
+    required this.height,
+    required this.weight,
+    required this.species,
+    required this.gender,
+    required this.eggGroups
   });
 
   factory PokemonDetail.fromJson(Map<String, dynamic> json) {
@@ -45,6 +56,12 @@ class PokemonDetail {
     final List<Stat> stats =
         (json['stats'] as List).map((stat) => Stat.fromJson(stat)).toList();
 
+    final double height = (json['height'] as int) / 10.0;
+    final double weight = (json['weight'] as int) / 10.0; 
+    final List<String> eggGroups = (json['egg_groups'] as List)
+        .map((group) => group['name'].toString())
+        .toList();
+
     return PokemonDetail(
       id: json['id'],
       name: json['name'],
@@ -52,6 +69,11 @@ class PokemonDetail {
       types: types,
       abilities: abilities,
       stats: stats,
+      height: height,
+      weight: weight,
+      species: json['species']['name'] ?? 'Unknown', 
+      gender: json['gender_rate'] ?? -1, 
+      eggGroups: eggGroups,
     );
   }
 }

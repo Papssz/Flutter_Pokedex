@@ -1,11 +1,11 @@
-import 'dart:async'; // Import for Timer
+import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../models/pokemon.dart';
 import '../services/pokeapi_service.dart';
 
 class PokemonDetailScreen extends StatefulWidget {
-  final String? pokemonName; // Optional: for direct navigation from list
+  final String? pokemonName;
 
   const PokemonDetailScreen({Key? key, this.pokemonName}) : super(key: key);
 
@@ -13,38 +13,68 @@ class PokemonDetailScreen extends StatefulWidget {
   State<PokemonDetailScreen> createState() => _PokemonDetailScreenState();
 }
 
-class _PokemonDetailScreenState extends State<PokemonDetailScreen> {
+class _PokemonDetailScreenState extends State<PokemonDetailScreen> with SingleTickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   final PokeApiService _pokeApiService = PokeApiService();
   PokemonDetail? _pokemonDetail;
   bool _isLoading = false;
   String? _errorMessage;
 
-  Timer? _debounce; // <--- Add this for debouncing
+  Timer? _debounce;
+  late TabController _tabController;
+
+  static const Map<String, Color> _typeColors = {
+    'normal': Color(0xFFA8A77A),
+    'fire': Color(0xFFEE8130),
+    'water': Color(0xFF6390F0),
+    'electric': Color(0xFFF7D02C),
+    'grass': Color(0xFF7AC74C),
+    'ice': Color(0xFF96D9D6),
+    'fighting': Color(0xFFC22E28),
+    'poison': Color(0xFFA33EA1),
+    'ground': Color(0xFFE2BF65),
+    'flying': Color(0xFFA98FF3),
+    'psychic': Color(0xFFF95587),
+    'bug': Color(0xFFA6B91A),
+    'rock': Color(0xFFB6A136),
+    'ghost': Color(0xFF735797),
+    'dragon': Color(0xFF6F35FC),
+    'steel': Color(0xFFB7B7CE),
+    'dark': Color(0xFF705746),
+    'fairy': Color(0xFFD685AD),
+    'unknown': Color(0xFF68A090),
+    'shadow': Color(0xFF493963),
+  };
+
+  Color _getBackgroundColorForType(String? type) {
+    if (type == null) return Colors.grey[400]!;
+    return _typeColors[type.toLowerCase()] ?? Colors.grey[400]!;
+  }
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 4, vsync: this);
     if (widget.pokemonName != null) {
       _searchController.text = widget.pokemonName!;
-      _searchPokemon(_searchController.text); // Pass initial text
+      _searchPokemon(_searchController.text);
     }
   }
 
   @override
   void dispose() {
-    _debounce?.cancel(); // <--- Cancel the timer when the widget is disposed
+    _debounce?.cancel();
     _searchController.dispose();
+    _tabController.dispose();
     super.dispose();
   }
 
-  // Modified search function to accept the query string
   Future<void> _searchPokemon(String query) async {
     query = query.trim().toLowerCase();
     if (query.isEmpty) {
       setState(() {
         _pokemonDetail = null;
-        _errorMessage = null; // Clear error message when search is empty
+        _errorMessage = null;
       });
       return;
     }
@@ -52,12 +82,11 @@ class _PokemonDetailScreenState extends State<PokemonDetailScreen> {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
-      _pokemonDetail = null; // Clear previous details
+      _pokemonDetail = null;
     });
 
     try {
       final pokemon = await _pokeApiService.fetchPokemonDetail(query);
-      // Only update if the search query hasn't changed while waiting for response
       if (_searchController.text.trim().toLowerCase() == query) {
         setState(() {
           _pokemonDetail = pokemon;
@@ -74,143 +103,271 @@ class _PokemonDetailScreenState extends State<PokemonDetailScreen> {
     }
   }
 
-  // This method will be called on every change in the TextField
   void _onSearchChanged(String text) {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
-    _debounce = Timer(const Duration(milliseconds: 500), () { // 500ms debounce
+    _debounce = Timer(const Duration(milliseconds: 500), () {
       _searchPokemon(text);
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final Color backgroundColor = _getBackgroundColorForType(
+      _pokemonDetail?.types.isNotEmpty == true ? _pokemonDetail!.types.first : null,
+    );
+
+    final double screenHeight = MediaQuery.of(context).size.height;
+    final double cardTopPosition = screenHeight * 0.4;
+    final double imageCenterOffset = 100; 
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Pokemon Details', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.blueGrey,
-        elevation: 0,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                labelText: 'Search Pokemon by Name or ID',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton( // Add a clear button
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                          _onSearchChanged(''); // Trigger clear search
-                        },
-                      )
-                    : null, // No clear button if text is empty
-              ),
-              onChanged: _onSearchChanged, // <--- Call _onSearchChanged on text input
-              onSubmitted: (_) => _searchPokemon(_searchController.text), // Still allow hitting enter
-            ),
-            const SizedBox(height: 20),
-            _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _errorMessage != null
-                    ? Center(
-                        child: Text(
-                          _errorMessage!,
-                          style: const TextStyle(color: Colors.red, fontSize: 16),
+      backgroundColor: backgroundColor,
+      body: Stack(
+        children: [
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: cardTopPosition + imageCenterOffset, 
+            child: Container(
+              color: backgroundColor,
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
+                            onPressed: () => Navigator.of(context).pop(),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.favorite_border, color: Colors.white, size: 28),
+                            onPressed: () {},
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      if (_pokemonDetail != null) ...[
+                        Text(
+                          _pokemonDetail!.name.toCapitalized(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 34,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      )
-                    : _pokemonDetail == null
-                        ? Center(
-                            child: _searchController.text.isEmpty // Show different message if search box is empty
-                                ? const Text(
-                                    'Start typing a Pokemon name or ID to search.',
-                                    style: TextStyle(fontSize: 16, color: Colors.grey),
-                                  )
-                                : const Text( // Show if no results for typed text
-                                    'No Pokemon found with that name/ID.',
-                                    style: TextStyle(fontSize: 16, color: Colors.orange),
-                                  ),
-                          )
-                        : Expanded(
-                            child: SingleChildScrollView(
-                              child: _buildPokemonDetailCard(_pokemonDetail!),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            '#${_pokemonDetail!.id.toString().padLeft(3, '0')}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
-          ],
-        ),
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: _pokemonDetail!.types.map((type) => _buildTypeChip(type)).toList(),
+                        ),
+                      ],
+                      if (_pokemonDetail == null) ...[
+                        TextField(
+                          controller: _searchController,
+                          onChanged: _onSearchChanged,
+                          onSubmitted: (_) => _searchPokemon(_searchController.text),
+                          style: const TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            labelText: 'Search Pokemon',
+                            labelStyle: const TextStyle(color: Colors.white70),
+                            filled: true,
+                            fillColor: Colors.white.withOpacity(0.2),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: BorderSide.none,
+                            ),
+                            suffixIcon: _searchController.text.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear, color: Colors.white),
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      _onSearchChanged('');
+                                    },
+                                  )
+                                : null,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          Positioned(
+        top: cardTopPosition,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        child: _isLoading // <--- START CHANGES FROM HERE
+            ? const Center(child: CircularProgressIndicator(color: Colors.white))
+            : _errorMessage != null
+                ? Center(
+                    child: Text(
+                      _errorMessage!,
+                      style: const TextStyle(color: Colors.white, fontSize: 16),
+                      textAlign: TextAlign.center,
+                    ),
+                  )
+                : _pokemonDetail == null // <--- THIS IS THE KEY CONDITIONAL CHECK
+                    ? Center(
+                        child: _searchController.text.isEmpty
+                            ? const Text(
+                                'Start typing a Pokemon name or ID to search.',
+                                style: TextStyle(fontSize: 18, color: Colors.white),
+                                textAlign: TextAlign.center,
+                              )
+                            : const Text(
+                                'No Pokemon found with that name/ID.',
+                                style: TextStyle(fontSize: 18, color: Colors.white),
+                                textAlign: TextAlign.center,
+                              ),
+                      )
+                    : Container( // <--- THIS IS THE CONTAINER FOR THE WHITE CARD
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.only(
+                            topLeft: Radius.circular(30),
+                            topRight: Radius.circular(30),
+                          ),
+                        ),
+                        child: Padding(
+                          padding: EdgeInsets.only(top: imageCenterOffset + 20, left: 16.0, right: 16.0),
+                          child: Column(
+                            children: [
+                              TabBar(
+                                controller: _tabController,
+                                labelColor: Colors.black,
+                                unselectedLabelColor: Colors.grey,
+                                indicatorColor: backgroundColor,
+                                indicatorSize: TabBarIndicatorSize.tab,
+                                tabs: const [
+                                  Tab(text: 'About'),
+                                  Tab(text: 'Base Stats'),
+                                ],
+                              ),
+                              Expanded(
+                                child: TabBarView(
+                                  controller: _tabController,
+                                  children: [
+                                    _buildAboutTab(_pokemonDetail!),
+                                    _buildBaseStatsTab(_pokemonDetail!),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+          ),
+
+          if (_pokemonDetail != null)
+            Positioned(
+              top: cardTopPosition - imageCenterOffset, 
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Hero(
+                  tag: _pokemonDetail!.name,
+                  child: CachedNetworkImage(
+                    imageUrl: _pokemonDetail!.imageUrl,
+                    placeholder: (context, url) => const CircularProgressIndicator(color: Colors.white),
+                    errorWidget: (context, url, error) => const Icon(Icons.error, size: 100, color: Colors.white),
+                    width: 500,
+                    height: 200,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
 
-  Widget _buildPokemonDetailCard(PokemonDetail pokemon) {
-    return Card(
-      elevation: 6,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+  Widget _buildTypeChip(String type) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      margin: const EdgeInsets.only(right: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        type.toCapitalized(),
+        style: const TextStyle(color: Colors.white, fontSize: 14),
+      ),
+    );
+  }
+
+  Widget _buildAboutTab(PokemonDetail pokemon) {
+    String genderInfo;
+    if (pokemon.gender == -1) {
+      genderInfo = 'Genderless';
+    } else {
+      double malePercentage = (8 - pokemon.gender) / 8 * 100;
+      double femalePercentage = (pokemon.gender) / 8 * 100;
+      genderInfo = '${malePercentage.toStringAsFixed(0)}% ♂, ${femalePercentage.toStringAsFixed(0)}% ♀';
+    }
+
+    return SingleChildScrollView(
       child: Padding(
-        padding: const EdgeInsets.all(20.0),
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(
-              child: Hero(
-                tag: pokemon.name,
-                child: CachedNetworkImage(
-                  imageUrl: pokemon.imageUrl,
-                  placeholder: (context, url) => const CircularProgressIndicator(),
-                  errorWidget: (context, url, error) => const Icon(Icons.error, size: 80),
-                  width: 150,
-                  height: 150,
-                  fit: BoxFit.contain,
-                ),
-              ),
-            ),
+            _buildAboutInfoRow('Species', pokemon.species.toCapitalized()),
+            _buildAboutInfoRow('Height', '${pokemon.height} m'),
+            _buildAboutInfoRow('Weight', '${pokemon.weight} kg'),
+            _buildAboutInfoRow('Abilities', pokemon.abilities.map((e) => e.toTitleCase()).join(', ')),
             const SizedBox(height: 20),
-            Center(
-              child: Text(
-                '#${pokemon.id} ${pokemon.name.toUpperCase()}',
-                style: const TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.deepPurple,
-                ),
-              ),
-            ),
-            const SizedBox(height: 15),
-            _buildInfoRow('Types:', pokemon.types.join(', ')),
-            _buildInfoRow('Abilities:', pokemon.abilities.join(', ')),
-            const SizedBox(height: 15),
             const Text(
-              'Base Stats:',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: Colors.indigo),
+              'Breeding',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
             ),
-            const SizedBox(height: 10),
-            ...pokemon.stats.map((stat) => _buildStatRow(stat)).toList(),
+            const Divider(),
+            _buildAboutInfoRow('Gender', genderInfo),
+            _buildAboutInfoRow('Egg Groups', pokemon.eggGroups.map((e) => e.toCapitalized()).join(', ')),
+            _buildAboutInfoRow('Egg Cycle', pokemon.eggGroups.isNotEmpty ? pokemon.eggGroups.first.toCapitalized() : 'Unknown'),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildInfoRow(String title, String value) {
+  Widget _buildAboutInfoRow(String title, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5.0),
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+          SizedBox(
+            width: 100,
+            child: Text(
+              title,
+              style: const TextStyle(fontSize: 16, color: Colors.grey),
+            ),
           ),
-          const SizedBox(width: 8),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(fontSize: 18),
+              style: const TextStyle(fontSize: 16, color: Colors.black87),
             ),
           ),
         ],
@@ -218,30 +375,67 @@ class _PokemonDetailScreenState extends State<PokemonDetailScreen> {
     );
   }
 
-  Widget _buildStatRow(Stat stat) {
+  Widget _buildBaseStatsTab(PokemonDetail pokemon) {
+    int totalStats = pokemon.stats.fold(0, (sum, stat) => sum + stat.baseStat);
+
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ...pokemon.stats.map((stat) => _buildStatRow(stat)).toList(),
+            const SizedBox(height: 10),
+            _buildStatRow(Stat(name: 'Total', baseStat: totalStats), isTotal: true),
+            const SizedBox(height: 20),
+            const Text(
+              'Type Effectiveness:',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
+            ),
+            const Divider(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatRow(Stat stat, {bool isTotal = false}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3.0),
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Row(
         children: [
           SizedBox(
-            width: 100,
+            width: 80,
             child: Text(
-              '${stat.name.replaceAll('-', ' ').toCapitalized()}:',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              isTotal ? stat.name : stat.name.replaceAll('-', ' ').toCapitalized(),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: isTotal ? FontWeight.bold : FontWeight.w500,
+                color: isTotal ? Colors.black : Colors.black54,
+              ),
+            ),
+          ),
+          SizedBox(
+            width: 40,
+            child: Text(
+              stat.baseStat.toString(),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
+                color: isTotal ? Colors.black : Colors.black87,
+              ),
             ),
           ),
           Expanded(
-            child: LinearProgressIndicator(
-              value: stat.baseStat / 200, // Max stat value is around 200 for better visual
-              backgroundColor: Colors.grey[300],
-              color: Colors.green,
-              minHeight: 10,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              child: LinearProgressIndicator(
+                value: stat.baseStat / 200,
+                backgroundColor: Colors.grey[300],
+                color: stat.baseStat > 70 ? Colors.green : (stat.baseStat > 40 ? Colors.orange : Colors.red),
+                minHeight: 8,
+              ),
             ),
-          ),
-          const SizedBox(width: 10),
-          Text(
-            stat.baseStat.toString(),
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
         ],
       ),
@@ -249,7 +443,6 @@ class _PokemonDetailScreenState extends State<PokemonDetailScreen> {
   }
 }
 
-// Extension to capitalize the first letter of each word
 extension StringCasingExtension on String {
   String toCapitalized() => length > 0
       ? '${this[0].toUpperCase()}${substring(1).toLowerCase()}'

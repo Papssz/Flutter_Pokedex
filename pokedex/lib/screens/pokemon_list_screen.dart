@@ -19,6 +19,34 @@ class _PokemonListScreenState extends State<PokemonListScreen> {
   final int _limit = 20;
   final ScrollController _scrollController = ScrollController();
 
+  static const Map<String, Color> _typeColors = {
+    'normal': Color(0xFFA8A77A),
+    'fire': Color(0xFFEE8130),
+    'water': Color(0xFF6390F0),
+    'electric': Color(0xFFF7D02C),
+    'grass': Color(0xFF7AC74C),
+    'ice': Color(0xFF96D9D6),
+    'fighting': Color(0xFFC22E28),
+    'poison': Color(0xFFA33EA1),
+    'ground': Color(0xFFE2BF65),
+    'flying': Color(0xFFA98FF3),
+    'psychic': Color(0xFFF95587),
+    'bug': Color(0xFFA6B91A),
+    'rock': Color(0xFFB6A136),
+    'ghost': Color(0xFF735797),
+    'dragon': Color(0xFF6F35FC),
+    'steel': Color(0xFFB7B7CE),
+    'dark': Color(0xFF705746),
+    'fairy': Color(0xFFD685AD),
+    'unknown': Color(0xFF68A090),
+    'shadow': Color(0xFF493963),
+  };
+
+  Color _getCardColorForType(String? type) {
+    if (type == null) return Colors.grey[200]!;
+    return _typeColors[type.toLowerCase()] ?? Colors.grey[200]!;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -45,9 +73,24 @@ class _PokemonListScreenState extends State<PokemonListScreen> {
     });
 
     try {
-      final newPokemon = await _pokeApiService.fetchPokemonList(offset: _offset, limit: _limit);
+      final newPokemonItems = await _pokeApiService.fetchPokemonList(offset: _offset, limit: _limit);
+      List<Future<PokemonListItem>> detailFetches = newPokemonItems.map((item) async {
+        try {
+          final detail = await _pokeApiService.fetchPokemonDetail(item.name);
+          return PokemonListItem(
+            name: item.name,
+            url: item.url,
+            primaryType: detail.types.isNotEmpty ? detail.types.first : null,
+          );
+        } catch (e) {
+          return item; 
+        }
+      }).toList();
+
+      List<PokemonListItem> itemsWithDetails = await Future.wait(detailFetches);
+
       setState(() {
-        _pokemonList.addAll(newPokemon);
+        _pokemonList.addAll(itemsWithDetails);
         _offset += _limit;
         _isLoading = false;
       });
@@ -91,12 +134,13 @@ class _PokemonListScreenState extends State<PokemonListScreen> {
                 mainAxisSpacing: 8.0,
                 childAspectRatio: 0.9,
               ),
-              itemCount: _pokemonList.length + (_isLoading ? 2 : 0), // Add space for loading indicator
+              itemCount: _pokemonList.length + (_isLoading ? 2 : 0),
               itemBuilder: (context, index) {
                 if (index < _pokemonList.length) {
                   final pokemon = _pokemonList[index];
                   return PokemonCard(
                     pokemon: pokemon,
+                    cardColor: _getCardColorForType(pokemon.primaryType),
                     onTap: () {
                       Navigator.push(
                         context,
